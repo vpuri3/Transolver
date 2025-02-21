@@ -37,12 +37,20 @@ class Physics_Attention_Irregular_Mesh(nn.Module):
         B, N, C = x.shape
 
         ### (1) Slice
+
+        # VALUE
         fx_mid = self.in_project_fx(x).reshape(B, N, self.heads, self.dim_head) \
             .permute(0, 2, 1, 3).contiguous()  # B H N C
+
+        # KEY
         x_mid = self.in_project_x(x).reshape(B, N, self.heads, self.dim_head) \
             .permute(0, 2, 1, 3).contiguous()  # B H N C
+        # QUERY = weights of self.in_project_slice
+        # softmax(K * Q) <-- softmax is happening along (-1) query direction. Aditya did it in -2 direction
         slice_weights = self.softmax(self.in_project_slice(x_mid) / self.temperature)  # B H N G
+        # 
         slice_norm = slice_weights.sum(2)  # B H G
+        # V * softmax(K * Q) <--- 
         slice_token = torch.einsum("bhnc,bhng->bhgc", fx_mid, slice_weights)
         slice_token = slice_token / ((slice_norm + 1e-5)[:, :, :, None].repeat(1, 1, 1, self.dim_head))
 
